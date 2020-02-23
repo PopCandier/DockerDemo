@@ -255,7 +255,7 @@ https://github.com/docker-library/tomcat/blob/master/8.5/jdk8/openjdk/Dockerfifi
 
 也就意味着，如何掌握了Dockerfile的语法，就可以自定义image。
 
-![1582446341053](D:\typoraimg\1582446341053.png)
+![1582446341053](./img/1582446341053.png)
 
 image的概念可以理解为一层一层的其他程序组合起来的集合器，对于一个MySql Image而言，如果docker需要启动它的话，里面的会有一个linux的内核，当做一个最小粒度的平台，接着是centos的操作系统，然后是自己自定义的环境变量参数，还有一些其他的指令，这些会被Dockerfile按照编写的顺序一个一个的build成一个image。
 
@@ -263,7 +263,7 @@ image的概念可以理解为一层一层的其他程序组合起来的集合器
 
 第一步准备一个jar包。
 
-![1582446896052](D:\typoraimg\1582446896052.png)
+![1582446896052](./img/1582446896052.png)
 
 然后在linux上随便创建一个文件夹
 
@@ -394,7 +394,7 @@ CMD ["java","-jar","dockerfile-demo-image.jar"]
 # 这里执行的命令也就是启动jar包的命令
 ```
 
-![1582448387583](D:\typoraimg\1582448387583.png)
+![1582448387583](./img/1582448387583.png)
 
 然后保存。接着开始构建image
 
@@ -403,13 +403,13 @@ docker build -t test-docker-image .
 				(构建一个image的名字) 后面的 "."表示在当前目录，也就是Dockerfile所在的位置。
 ```
 
-![1582448615933](D:\typoraimg\1582448615933.png)
+![1582448615933](./img/1582448615933.png)
 
 可以看到，他是按照我们的步骤进行操作的，image也被添加上去。
 
-![1582448666831](D:\typoraimg\1582448666831.png)同样是可以成功运行
+![1582448666831](./img/1582448666831.png)同样是可以成功运行
 
-![1582448748317](D:\typoraimg\1582448748317.png)
+![1582448748317](./img/1582448748317.png)
 
 如何证明我们已经启动成功，首先可以通过查看日志。
 
@@ -417,7 +417,7 @@ docker build -t test-docker-image .
 docker logs [--name的别名]
 ```
 
-![1582448835635](D:\typoraimg\1582448835635.png)
+![1582448835635](./img/1582448835635.png)
 
 第二个，是首先进入容器。
 
@@ -427,11 +427,11 @@ docker exec -it demo01 sh
 
 然后用curl的命令，尝试去访问这个jar包中的接口是否可以正确返回。
 
-![1582449013040](D:\typoraimg\1582449013040.png)
+![1582449013040](./img/1582449013040.png)
 
 你直接通过别的机器访问也可以，当时要注意端口请输入你映射到物理主机上的端口
 
-![1582449105148](D:\typoraimg\1582449105148.png)
+![1582449105148](./img/1582449105148.png)
 
 #### 仓库的搭建
 
@@ -443,11 +443,11 @@ https://cr.console.aliyun.com/cn-hangzhou/instances/repositories
 
 首先你需要注册一个阿里云仓库，并开启仓库服务
 
-![1582449983682](D:\typoraimg\1582449983682.png)
+![1582449983682](./img/1582449983682.png)
 
 然后再docker 登陆阿里云的账号。
 
-![1582450063743](D:\typoraimg\1582450063743.png)
+![1582450063743](./img/1582450063743.png)
 
 ```
 sudo docker login --username=candierpop registry.cn-hangzhou.aliyuncs.com
@@ -455,11 +455,11 @@ sudo docker login --username=candierpop registry.cn-hangzhou.aliyuncs.com
 
 `--username`是你的用户名，后面是固定写法
 
-![1582450164625](D:\typoraimg\1582450164625.png)
+![1582450164625](./img/1582450164625.png)
 
 **需要注意的是这里的密码并不是你的账号密码，而是开通仓库的时候输入的密码**
 
-![1582450218227](D:\typoraimg\1582450218227.png)
+![1582450218227](./img/1582450218227.png)
 
 将image推到自己的阿里云仓库。可以先生成一个**副本**。
 
@@ -468,7 +468,7 @@ sudo docker login --username=candierpop registry.cn-hangzhou.aliyuncs.com
 docker tag test-docker-image candierpop/test-docker-image:v1.0
 ```
 
-![1582450935017](D:\typoraimg\1582450935017.png)
+![1582450935017](./img/1582450935017.png)
 
 要推送到阿里云上，需要打上一定规则的tag，才可以上传成功。
 
@@ -477,7 +477,7 @@ docker tag test-docker-image candierpop/test-docker-image:v1.0
 sudo docker tag test-docker-image registry.cn-hangzhou.aliyuncs.com/docker_space01/test- docker-image:v1.0
 ```
 
-![1582451336412](D:\typoraimg\1582451336412.png)
+![1582451336412](./img/1582451336412.png)
 
 开始上传。
 
@@ -485,15 +485,15 @@ sudo docker tag test-docker-image registry.cn-hangzhou.aliyuncs.com/docker_space
 sudo docker push registry.cn-hangzhou.aliyuncs.com/docker_space01/test-docker-image:v1.0
 ```
 
-![1582453178045](D:\typoraimg\1582453178045.png)
+![1582453178045](./img/1582453178045.png)
 
 等待push完毕。
 
-![1582453257325](D:\typoraimg\1582453257325.png)
+![1582453257325](./img/1582453257325.png)
 
 push完毕，然后去自己的仓库上看一看。
 
-![1582453308708](D:\typoraimg\1582453308708.png)
+![1582453308708](./img/1582453308708.png)
 
 然后尝试删除掉本地的images，去阿里云拉取，然后运行，是否可以
 
@@ -501,14 +501,14 @@ push完毕，然后去自己的仓库上看一看。
  docker pull registry.cn-hangzhou.aliyuncs.com/docker_space01/test-docker-image:v1.0
 ```
 
-![1582453812740](D:\typoraimg\1582453812740.png)
+![1582453812740](./img/1582453812740.png)
 
 ```
 docker run -d --name demo02 -p 9191:8080 registry.cn-hangzhou.aliyuncs.com/docker_space01/test-docker-image:v1.0
 
 ```
 
-![1582454050684](D:\typoraimg\1582454050684.png)
+![1582454050684](./img/1582454050684.png)
 
 访问也是没问题的
 
@@ -516,7 +516,7 @@ docker run -d --name demo02 -p 9191:8080 registry.cn-hangzhou.aliyuncs.com/docke
 
 https://github.com/goharbor/harbor
 
-![1582454863642](D:\typoraimg\1582454863642.png)
+![1582454863642](./img/1582454863642.png)
 
 下载完成后，解压。
 
@@ -537,11 +537,11 @@ harbor_admin_password = Harbor12345
 # 用户名 admin 密码是这个
 ```
 
-![1582455226544](D:\typoraimg\1582455226544.png)
+![1582455226544](./img/1582455226544.png)
 
 数据将会被放在**根目录**，如果你的根目录没有这么大的空间，就需要修改。
 
-![1582455311355](D:\typoraimg\1582455311355.png)
+![1582455311355](./img/1582455311355.png)
 
 还有很多，所以可以放在这里。
 
@@ -575,7 +575,7 @@ docker commit [某个现有的container名字] [新的名字]
 
 先启动一个container
 
-![1582456681942](D:\typoraimg\1582456681942.png)
+![1582456681942](./img/1582456681942.png)
 
 查看container的状态
 
@@ -584,7 +584,7 @@ docker top demo01 #不专业
 docker stats demo01 # 很专业
 ```
 
-![1582456775845](D:\typoraimg\1582456775845.png)
+![1582456775845](./img/1582456775845.png)
 
 可以看到，由于内存没有进行限制，他的上显示2.7g，会无限上升。所以我们创建一个限制的container
 
@@ -594,7 +594,7 @@ docker stats demo01 # 很专业
 
 再次查看
 
-![1582457050123](D:\typoraimg\1582457050123.png)
+![1582457050123](./img/1582457050123.png)
 
 ```
 docker rm -f $(docker ps -aq) 删除全部容器
