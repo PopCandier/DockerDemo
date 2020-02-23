@@ -600,3 +600,175 @@ docker stats demo01 # 很专业
 docker rm -f $(docker ps -aq) 删除全部容器
 ```
 
+
+
+#### 网络
+
+在linux版本的docker engine下，每个根据image而创造出来的container都是一个小型的linux内核，则意味着每个container都可能是一个centos操作系统上装上了包含了container中东西的一个程序。
+
+同时在docker中，每个容器都是可以互相通信的。当我们安装docker成功的时候，会发现我们会多出一张名字为docker0的网卡。
+
+![1582462862018](./img/1582462862018.png)
+
+下面的`172.17.0.1`是docker中容器的局域网地址，lo是代表本地环路地址，一般是固定的，因为一个机器本身自己也可以成一个网络，eth0和eth1不固定，一个代表的是联络外网的网卡，也就是和外网通信的网卡，一个是物理机器局域网的网卡。
+
+网卡作为机器通信的物理基础，也就代表了机器可以正常在网络通信的唯一证明，所以网卡所拥有的MAC地址是唯一的，和id唯一是同样的。
+
+之前说了linux 版本的 docker engine中的container实际上是一个有一个的linux容器，那么为什么作为安装了docker的宿主linux会允许自己里面运行若干的linux机器，同时还可以拥有自己的网络呢。
+
+原因在于linux中的`network namespace`技术，它可以将每一台linux系统进行隔离，操作系统和网络的隔离，所以才会允许这种多系统的运行。
+
+而能够让他们彼此通信的则依赖了`veth pair（Virtual Ethernet Pair）`技术，这种技术会同时发放一对可以互相通信的网卡，然后你可以将它发放给需要通信两台机器，同时授予他们ip地址，并且开启网卡，这个时候就可以通信成功。
+
+我们没有启动docker中任何容器前，网卡列表是这样的。
+
+![1582463860010](./img/1582463860010.png)
+
+当我们启动一个docker容器的时候，在查看一下。
+
+![1582463916103](./img/1582463916103.png)
+
+可以发现，下面多了一张网卡，而且命名也很奇怪，不过他的状态是**UP**开启的状态。
+
+然后我们进入刚刚启动的容器看一看
+
+![1582464039258](./img/1582464039258.png)
+
+可以发现后面的一个是if32一个是if33，这是veth技术创建一对网卡很好的证明，因为按照序号排列，他们是成对出现的，而且我们发现容器中的这个网卡的ip地址其实是存在于docker0的网段的。
+
+我们可以再创建一个容器。
+
+![1582464185645](./img/1582464185645.png)
+
+![1582464284377](./img/1582464284377.png)
+
+答案也很明显了。
+
+![1582465460323](./img/1582465460323.png)
+
+这也说明了为什么在宿主主机上可以ping通容器。
+
+![1582465321123](./img/1582465321123.png)
+
+是因为宿主主机上每次创建新的容器都会被分配新的veth peer网卡，那么为什么容器和容器可以彼此ping通，是因为他们在同一网段，有docker0作为桥梁。
+
+##### 只用名字就能ping通网络。
+
+在一个这样的场景中，例如一个springboot项目需要使用mysql数据库，springboot项目和mysql数据都准备做成image在docker上运行，但由于每次docker run的时候，ip地址是不固定的，所以希望如果把名字作为可以ping通的ip地址就好了，这样写配置文件的时候，就不用纠结数据库的ip地址写什么了。
+
+这就需要创建我们自己的network
+
+docker安装完成后，默认的network是docker0，也就是172.17.0.1这个网关。
+
+创建自定义的network的两个好处
+
+* 如果ip地址不够用了，可以再次创建出另一个网段的ip地址供给使用。
+* 可以用名字就能ping通，不用考虑ip的变动。
+
+查看现有的network网络列表。
+
+```
+docker network ls
+```
+
+![1582468580697](./img/1582468580697.png)
+
+第一个名字为bridge代表是docker0的网络，host代表的是物理主机的，也是宿主centos的网络，none只有一个本地地址，不能通信，存在理由也是未知的。
+
+检查一下bridge
+
+```
+docker network inspect bridge
+```
+
+首先创建一个自己的network
+
+```
+docker network create test-net 
+or
+docker network create --subnet=172.18.0.0/24 test-net
+```
+
+![1582468790649](./img/1582468790649.png)
+
+同时我们的宿主主机也多了这样一项目。
+
+![1582468843516](./img/1582468843516.png)
+
+而画图理解的话，就相当于这样。
+
+![1582469076486](./img/1582469076486.png)
+
+这属于两个不同的网络了，虽然都属于桥接（bridge）。
+
+接着就是将容器加入到新创建的网络中。
+
+```
+docker run -d --name demo01 --network test-net -p 9090:8080 test-docker-image
+```
+
+我们创建两个
+
+![1582469380629](./img/1582469380629.png)
+
+![1582469763484](./img/1582469763484.png)
+
+前面我们知道彼此是处于同一网络中的容器是可以互相ping通的，宿主主机和容器也是可以ping通的，因为有veth peer技术的支持。
+
+同时我们检查一个新创建的`172.18.0.1`中。
+
+```json
+[root@admin harbor]# docker network inspect test-net
+[
+    {
+        "Name": "test-net",
+        "Id": "9e88b9008f259140cd15cd4658e3291d7888cb8b143c393e6211328cb615456f",
+        "Created": "2020-02-23T22:39:19.673058914+08:00",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/24"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {
+            "b4450357e30559c0f5e83cb69dd8e3ee666ad1498424a92e1846f3f1b41a2034": {
+                "Name": "demo02",
+                "EndpointID": "ba5e9c6876c4cd5c90e677d7770d4a6a115bba49d5ae173878e6cf716c6dbe8b",
+                "MacAddress": "02:42:ac:12:00:03",
+                "IPv4Address": "172.18.0.3/24",
+                "IPv6Address": ""
+            },
+            "dc34021e7e7403c508538488d2c3f535d7018bcf722e0d1b85000cd11378f157": {
+                # 两个container已经被添加成功。
+                "Name": "demo01",
+                "EndpointID": "de582d9c3ace2f4eef7814b605018cfc478468b1ab66c9fb29077d0750126077",
+                "MacAddress": "02:42:ac:12:00:02",
+                "IPv4Address": "172.18.0.2/24",
+                "IPv6Address": ""
+            }
+        },
+        "Options": {},
+        "Labels": {}
+    }
+]
+
+```
+
+现在我们新创建了一个test-net网络，看看能否用名字去ping通。
+
+![1582469986332](./img/1582469986332.png)
+
+我们发现是可以互相ping通的。
