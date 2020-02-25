@@ -772,3 +772,283 @@ docker run -d --name demo01 --network test-net -p 9090:8080 test-docker-image
 ![1582469986332](./img/1582469986332.png)
 
 我们发现是可以互相ping通的。
+
+#### 关于容器的持久化存储
+
+https://github.com/docker-library/mysql/blob/master/5.7/Dockerfile
+
+例如mysql的持久化方案。
+
+![1582618977792](./img/1582618977792.png)
+
+VOLUME关键字代表容器数据所挂载的位置，我们可以使用
+
+```
+docker volume ls
+```
+
+来查看当前docker中有多少这样的路径。
+
+![1582619049026](./img/1582619049026.png)
+
+当我们启动一个mysql容器的时候
+
+```
+docker run -d --name mysql01 -e MYSQL_ROOT_PASSWORD=123456 mysql
+```
+
+就会多出这样一个值。
+
+![1582619573684](./img/1582619573684.png)
+
+不过，如果你觉得这个名字不够好看，你也可以自己定义目录名字
+
+```
+docker run -d --name mysql02 -v mysql02_volume:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 mysql
+```
+
+![1582619842613](./img/1582619842613.png)
+
+这样可读性就好一点。
+
+**同时也意味着，如果你的volume不去删除，将会永远存在物理主机上，同时也可以做数据的恢复。但是要指定路径**
+
+##### tomcat 中的开发需要实施部署。
+
+在docker中启动一个tomcat的时候，可以指定宿主路径和容器的路径进行匹配，这样在你修改的时候，就会同步更新。
+
+```
+docker run -d --name tomcat01 -v /tmp/[项目名字]:/var/lib/tomcat/webapps/[项目名字] -p 8081:8080 tomcat
+```
+
+这样当你修改宿主主机/tmp/[项目名字]文件的时候，就会同步更新
+
+这就是docker 中的 **Bind Mounting**技术。
+
+如果你想要在window系统上更新文件同步在docker容器中更新的话，那么你就需要看虚拟机之间是否有映射关系。
+
+##### docker 中mysql强一致解决方案
+
+```
+docker pull percona/percona-xtradb-cluster:5.7.21
+```
+
+搭建的需要考虑的几个要素。
+
+* 网络
+  * 我们需要创建一个全新的网络(network)方便管理
+  * 同时，新的网络可以使用名字ping通，也方便管理
+* 存储
+  * 我们需要预先创建好三个预设好的存储节点
+* 如果启动
+  * 启动这个image需要配置什么参数。
+
+名字太长了，我们打个tag，用于修改名字。
+
+```
+docker tag percona/percona-xtradb-cluster:5.7.21 pxc
+```
+
+> 创建网络
+
+```
+docker network create --subnet=172.19.0.0/24 pxc-net
+```
+
+![1582625530993](./img/1582625530993.png)
+
+> 创建三个挂载节点目录
+
+```
+[root@admin _data]# docker volume create --name v1
+v1
+[root@admin _data]# docker volume create --name v2
+v2
+[root@admin _data]# docker volume create --name v3
+v3
+[root@admin _data]# docker volume ls
+DRIVER              VOLUME NAME
+local               mysql02_volume
+local               v1
+local               v2
+local               v3
+[root@admin _data]# docker volume inspect v1
+```
+
+![1582625797138](./img/1582625797138.png)
+
+> 启动容器
+
+```
+docker run -d -p 3301:3306 -v v1:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=123456 --privileged --name node1 --net=pxc-net --ip=172.19.0.2 pxc
+```
+
+![1582627618410](./img/1582627618410.png)
+
+之后增加的节点，需要增加 `-e CLUSTER_JOIN=node1`，表示要加入到哪个节点中，虽然是加入，但是其实只是一个加入的参照物而已，只要要加入的值是在那个分布式群里就行。
+
+```dockerfile
+# node2 的加入
+docker run -d -p 3302:3306 -v v2:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=123456 --privileged -e CLUSTER_JOIN=node1  --name node2 --net=pxc-net --ip=172.19.0.3 pxc
+# node3 的加入
+docker run -d -p 3303:3306 -v v3:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=123456 --privileged -e CLUSTER_JOIN=node1  --name node3 --net=pxc-net --ip=172.19.0.4 pxc
+
+```
+
+```
+docker run -d -p 3301:3306 -v v1:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=jack123 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=jack123 --privileged --name=node1 --net=pxc-net --ip 172.19.0.2 pxc
+
+docker run -d -p 3302:3306 -v v2:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=jack123 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=jack123 -e CLUSTER_JOIN=node1 --privileged --name=node2 --net=pxc-net --ip 172.19.0.3 pxc
+
+docker run -d -p 3303:3306 -v v3:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=jack123 -e CLUSTER_NAME=PXC -e XTRABACKUP_PASSWORD=jack123 -e CLUSTER_JOIN=node1 --privileged --name=node3 --net=pxc-net --ip 172.19.0.4 pxc
+```
+
+##### springboot+nginx+mysql
+
+![1582635166820](./img/1582635166820.png)
+
+* 第一步创建网络
+* 第二部创建在位置
+
+```
+docker run -d--name my-mysql -v v1:/var/lib/mysql -p3301:3306 -eMYSQL_ROOT_PASSWORD=jack123 --net=pro-net --ip172.18.0.6 mysql
+
+(1)在本地测试该项目的功能主要是修改application.yml文件中数据库的相关配置
+
+(2)在项目根目录下执行mvn clean package打成一个jar包
+
+[记得修改一下application.yml文件数据库配置]mvn clean package -Dmaven.test.skip=true在target下找到"springboot-mybatis-0.0.1-SNAPSHOT.jar.jar"
+
+(3)在docker环境中新建一个目录"springboot-mybatis"
+
+(4)上传"springboot-mybatis-0.0.1-SNAPSHOT.jar"到该目录下，并且在此目录创建Dockerfile
+
+(5)编写Dockerfile内容FROM openjdk:8-jre-alpineMAINTAINER itcrazy2016    LABEL name="springboot-mybatis" version="1.0" author="itcrazy2016"COPY springboot-mybatis-0.0.1-SNAPSHOT.jar springboot-mybatis.jarCMD ["java","-jar","springboot-mybatis.jar"]
+
+(6)基于Dockerfile构建镜像docker build -t sbm-image .
+
+(7)基于image创建containerdocker run -d --name sb01 -p 8081:8080 --net=pro-net --ip 172.18.0.11 sbm-image
+
+(8)查看启动日志docker logs sb01
+
+(9)在win浏览器访问http://192.168.8.118:8081/user/listall
+```
+
+由于在一个网络中名字是可以ping通的，所以数据库地址还可以改成这样
+
+```
+url: jdbc:mysql://my-mysql/db_gupao_springboot?
+```
+
+> Nginx
+
+(1)在centos的/tmp/nginx下新建nginx.conf文件，并进行相应的配置
+
+```
+user nginx;
+worker_processes  1;
+events {   
+	worker_connections  1024;
+}
+http {    
+	include       /etc/nginx/mime.types;
+	default_type  application/octet-stream;    
+	sendfile        on;    
+	keepalive_timeout  65;    
+	server {        
+		listen 80;        
+		location / {         
+			proxy_pass http://balance;        
+		}    
+	}    
+	upstream balance{          
+		server 172.18.0.11:8080;        
+		server 172.18.0.12:8080;        
+		server 172.18.0.13:8080;    
+	}    
+	include /etc/nginx/conf.d/*.conf;
+}
+```
+
+创建nginx容器
+
+先在centos7上创建/tmp/nginx目录，并且创建nginx.conf文件，写上内容
+
+```
+docker run -d --name my-nginx -p 80:80 -v/tmp/nginx/nginx.conf:/etc/nginx/nginx.conf --network=pro-net --ip 172.18.0.10 nginx
+```
+
+
+
+#### 安装docker-compose
+
+https://docs.docker.com/compose/install/
+
+首先，如果你再Mac环境和Window环境下安装了docker，那么dockercompose就已经默认安装完成了。
+
+![1582638743328](./img/1582638743328.png)
+
+linux安装步骤
+
+```dockerfile
+# 1
+sudo curl -L "https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+# 2
+sudo chmod +x /usr/local/bin/docker-compose
+# 3
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+```
+
+`docker-compose.yml`
+
+```yml
+version: '3' # 版本号，一般固定
+services: # 表示下面会有多个 container
+  web:		# container的名字
+    build: .	# 表示这个image还不存在，且需要dockerfile构建，这个时候dockerfile文件存在于当前目录
+    ports:		# 指定端口
+      - "5000:5000"
+  redis:	# container的名字	
+    image: "redis:alpine"	# 表示从远程仓库拉取
+    networks:
+    	- app-net # 表示使用哪个网络
+    	
+networks: # 创建网络
+	app-net:
+		driver: bridge
+```
+
+在存在docker-compose.yaml文件的位置执行命令,默认找当前目录的docker-compose.yaml
+
+```
+docker-compose up -f docker-compose.yaml -d
+```
+
+文件中指定的container将会启动完成
+
+#### Docker Swarm
+
+docker-compose是单机管理容器的解决方案，那么Docker Swarm就是多机的解决方案。
+
+将多台安装了docker的机器，组成一个集群，共同给外界提供服务，并且可以很好管理多个容器。
+
+docker swarm在安装完docker后就自带了。
+
+```
+docker swarm
+```
+
+![1582641170292](./img/1582641170292.png)
+
+![1582641614033](./img/1582641614033.png)
+
+首先你需要三台机器，然后确定ip地址。
+
+```dockerfile
+# 选择一个作为Leader,这条命令执行后，会出现一条命令，主要切换到其他机器分别执行就好了
+docker swarm init --advertise-addr=192.168.0.2
+# 查看当前swarm集群的个数
+docker node ls
+
+```
+
