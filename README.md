@@ -1052,3 +1052,32 @@ docker node ls
 
 ```
 
+添加完成后，可以在某个机器上输入这样一个来表示创建一个容器
+
+```dockerfile
+docker service create --name my-tomcat tomcat
+
+docker service ls
+
+# 扩容，scale命令，按照某一个已经启动好的容器，再创建若干个和这个容器一样的容器你
+docker service scale my-tomcat=3
+# 再创建三个
+```
+
+多机之间通信，需要创建overlay的网络
+
+```
+docker network create -d overlay overlay-net
+```
+
+启动的时候，带上这个网络即可
+
+```
+docker service create --name my-tomcat tomcat --network overlay-net
+```
+
+**不过请保证，其它三台机器的ip请不要相同**。
+
+集群中的任何机器访问，都可以访问到docker service create创建的容器。
+
+也就是类似复杂均衡的隔绝在中间，会分发请求。
